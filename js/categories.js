@@ -4,36 +4,38 @@ const Categories = (() => {
     'Alimente', 'Restaurante și cafenele', 'Livrare mâncare', 'Transport', 'Combustibil', 'Taxi',
     'Utilități', 'Telefon și internet', 'Abonamente', 'Sănătate', 'Cumpărături', 'Haine',
     'Casă', 'Divertisment', 'Educație', 'Călătorii', 'Transferuri', 'Comisioane bancare',
-    'Cheltuieli cash', 'Retragere numerar', 'Depunere numerar', 'Salariu', 'Alte venituri', 'Altele'
+    'Cheltuieli cash', 'Retragere numerar', 'Depunere numerar', 'Economii (depozit)', 'Între conturile mele', 'Salariu', 'Alte venituri', 'Altele'
   ];
 
-  // Mutări între card și cash: nu sunt cheltuieli și nici venituri.
-  const MOVES = new Set(['Retragere numerar', 'Depunere numerar']);
+  // Mutări între card, cash, depozit și conturile proprii: nu sunt cheltuieli și nici venituri.
+  const MOVES = new Set(['Retragere numerar', 'Depunere numerar', 'Economii (depozit)', 'Între conturile mele']);
   const INCOME = new Set(['Salariu', 'Alte venituri']);
 
   // Cuvinte cheie (fără diacritice, litere mici). Primul care se potrivește câștigă.
   const BUILTIN = [
     ['Retragere numerar', ['atm', 'bancomat', 'cash withdrawal', 'retragere numerar', 'eliberare numerar', 'снятие налич', 'выдача налич']],
-    ['Depunere numerar', ['depunere numerar', 'cash deposit', 'cash-in', 'взнос налич']],
-    ['Comisioane bancare', ['comision', 'commission', 'fee ', 'комисси', 'abonament card', 'deservire']],
+    ['Depunere numerar', ['depunere numerar', 'cash deposit', 'cash-in', 'взнос налич', 'alimentare cont de la terminal']],
+    ['Economii (depozit)', ['cont depozit', 'deschidere depozit']],
+    ['Comisioane bancare', ['comision', 'commission', 'fee ', 'комисси', 'abonament card', 'deservire', 'imp.retin', 'impozit']],
     ['Salariu', ['salariu', 'salary', 'зарплат', 'заработн']],
+    ['Alte venituri', ['dobanda']],
     ['Livrare mâncare', ['glovo', 'straus', 'yandex eats', 'wolt', 'foodhouse', 'delivery']],
     ['Taxi', ['yandex go', 'yandex.go', 'yango', 'bolt', 'uber', 'itaxi', 'taxi', 'такси']],
-    ['Combustibil', ['petrom', 'lukoil', 'rompetrol', 'bemol', 'tirex', 'avante', 'vento', 'datario', 'benzin', 'fuel', 'азс']],
+    ['Combustibil', ['petrom', 'lukoil', 'rompetrol', 'bemol', 'tirex', 'avante', 'vento', 'datario', 'fox petrol', 'now oil', 'peco', 'benzin', 'fuel', 'азс']],
     ['Transport', ['rtec', 'urban bus', 'transport', 'parking', 'parcare', 'cfm', 'autogara', 'mpay']],
-    ['Alimente', ['linella', 'nr1', 'nr.1', 'fidesco', 'kaufland', 'metro cash', 'green hills', 'velmart', 'merci', 'ulybka', 'supermarket', 'minimarket', 'magazin alimentar', 'fourchette']],
-    ['Restaurante și cafenele', ['andys', "andy's", 'la placinte', 'mcdonald', 'kfc', 'cafe', 'coffee', 'tucano', 'restaurant', 'pizza', 'burger', 'starbucks', 'oliva', 'robins']],
+    ['Alimente', ['linella', 'moldretail', 'nr1', 'nr.1', 'nr 1', 'local', 'metro', 'apa pura', 'franzeluta', 'fidesco', 'kaufland', 'metro cash', 'green hills', 'velmart', 'merci', 'ulybka', 'supermarket', 'minimarket', 'magazin alimentar', 'fourchette']],
+    ['Restaurante și cafenele', ['andys', "andy's", 'la placinte', 'mcdonald', 'mcd ', 'kfc', 'grill', 'kebab', 'gasthaus', 'catering', 'unicafe', 'cafe', 'coffee', 'tucano', 'restaurant', 'pizza', 'burger', 'starbucks', 'oliva', 'robins']],
     ['Telefon și internet', ['orange', 'moldcell', 'moldtelecom', 'starnet', 'arax']],
     ['Utilități', ['premier energy', 'energocom', 'moldovagaz', 'termoelectrica', 'apa-canal', 'apa canal', 'red nord', 'gas natural', 'chirie', 'intretinere']],
-    ['Abonamente', ['netflix', 'spotify', 'youtube', 'apple.com', 'icloud', 'google play', 'google one', 'microsoft', 'adobe', 'chatgpt', 'openai', 'anthropic', 'claude', 'playstation', 'steam', 'xbox', 'megogo', 'voyo', 'patreon']],
+    ['Abonamente', ['netflix', 'spotify', 'youtube', 'apple.com', 'icloud', 'google play', 'google one', 'microsoft', 'adobe', 'chatgpt', 'openai', 'anthropic', 'claude', 'playstation', 'steam', 'xbox', 'megogo', 'voyo', 'patreon', 'yandex.plus']],
     ['Sănătate', ['farmacia', 'farmacie', 'felicia', 'hippocrates', 'medpark', 'sancos', 'clinica', 'stomatolog', 'аптек', 'pharma', 'medical']],
     ['Haine', ['zara', 'h&m', 'lc waikiki', 'koton', 'reserved', 'sinsay', 'defacto', 'deichmann', 'sportmaster', 'nike', 'adidas']],
     ['Cumpărături', ['emag', 'darwin', 'enter.md', 'maximum', 'bomba', 'aliexpress', 'temu', 'amazon', 'ozon', 'wildberries', 'jysk']],
     ['Casă', ['ikea', 'mobilier', 'supraten', 'baucenter', 'agora', 'leroy']],
-    ['Divertisment', ['cinema', 'patria', 'cineplex', 'iticket', 'concert', 'teatru', 'bowling']],
-    ['Educație', ['udemy', 'coursera', 'universitat', 'scoala', 'curs ', 'librarie', 'bestseller']],
+    ['Divertisment', ['cinema', 'patria', 'cineplex', 'iticket', 'ticketshop', 'concert', 'teatru', 'bowling']],
+    ['Educație', ['udemy', 'coursera', 'universitat', 'scoala', 'curs ', 'librari', 'bestseller']],
     ['Călătorii', ['airbnb', 'booking', 'hotel', 'wizz', 'flyone', 'airmoldova', 'ryanair', 'hostel', 'airport']],
-    ['Transferuri', ['transfer', 'p2p', 'card to card', 'перевод', 'mia ', 'plata instant']]
+    ['Transferuri', ['transfer', 'p2p', 'a2a', 'card to card', 'перевод', 'mia ', 'plata instant']]
   ];
 
   function norm(s) {

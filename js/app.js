@@ -13,6 +13,7 @@
   async function load() {
     [state.txs, state.cash, state.rules] = await Promise.all([DB.all('transactions'), DB.all('cash'), DB.all('rules')]);
     state.remindDays = Number(await DB.getSetting('remindDays', 3));
+    state.balances = await DB.getSetting('balances', {});
   }
 
   function toast(msg) {
@@ -55,7 +56,7 @@
 
   // ---------- Sus: total ----------
   function renderTop() {
-    const card = Stats.cardBalance(state.txs);
+    const card = Stats.cardBalance(state.txs, state.balances);
     const cash = Stats.cashBalance(state.cash, state.txs);
     const total = (card ? card.value : 0) + (cash ? cash.value : 0);
     $('topTotal').textContent = card || cash ? money(Math.round(total)) : '—';
@@ -75,9 +76,11 @@
 
     $('emptyState').hidden = state.txs.length > 0 || state.cash.length > 0;
 
-    const card = Stats.cardBalance(state.txs);
+    const card = Stats.cardBalance(state.txs, state.balances);
     $('tileCard').textContent = card ? money(Math.round(card.value)) : '—';
-    $('tileCardSub').textContent = card ? `la ${dayLabel(card.date)}` : 'din extras (coloana Sold)';
+    $('tileCardSub').textContent = card
+      ? (card.accounts > 1 ? `${card.accounts} conturi, ` : '') + `la ${dayLabel(card.date)}`
+      : 'importă un extras';
 
     const cash = Stats.cashBalance(state.cash, state.txs);
     $('tileCash').textContent = cash ? money(Math.round(cash.value)) : '—';
@@ -194,6 +197,14 @@
     if (!file) return;
     $('importResult').hidden = true;
     try {
+      const buf = await file.arrayBuffer();
+      if (new TextDecoder().decode(new Uint8Array(buf, 0, 5)) === '%PDF-') {
+        showImportResult('Citesc PDF-ul…');
+        const { meta, transactions } = await PdfStatement.read(buf, state.rules);
+        $('importResult').hidden = true;
+        state.pending = { pdf: true, meta, result: transactions, name: file.name };
+        return renderPdfPreview();
+      }
       const rows = await Importer.readFile(file);
       if (rows.length < 2) throw new Error('Fișierul pare gol.');
       const headerIdx = Importer.findHeader(rows);
@@ -211,6 +222,7 @@
   function renderMapping() {
     const p = state.pending;
     $('mappingCard').hidden = false;
+    $('mappingCard').querySelector('h2').textContent = 'Verifică coloanele';
     $('mappingInfo').textContent = `${p.name}: ${p.rows.length - p.headerIdx - 1} rânduri. Am ghicit coloanele, verifică-le.`;
     const opts = '<option value="">—</option>' + p.header.map((h, i) => `<option value="${i}">${esc(h || 'Coloana ' + (i + 1))}</option>`).join('');
     $('mapping').innerHTML = Importer.FIELDS.map(([f, label]) =>
@@ -236,11 +248,30 @@
     if (!ok) { $('previewTable').innerHTML = '<tr><td>Alege coloanele Data, Descriere și Suma (sau Debit/Credit).</td></tr>'; return; }
     const { transactions, skipped } = Importer.build(p.rows, p.headerIdx, p.map, { invert: p.invert, rules: state.rules });
     p.result = transactions;
+    renderPreviewTable(transactions, skipped ? `, ${skipped} rânduri sărite (fără dată sau sumă)` : '');
+  }
+
+  function renderPreviewTable(transactions, note = '') {
     const head = '<tr><th>Data</th><th>Descriere</th><th>Suma</th><th>Categorie</th></tr>';
     const body = transactions.slice(0, 8).map((t) =>
       `<tr><td>${t.date}</td><td>${esc(t.description.slice(0, 50))}</td><td>${money(t.amount, true)}</td><td>${esc(t.category)}</td></tr>`).join('');
+    const inn = transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+    const out = -transactions.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0);
     $('previewTable').innerHTML = head + body +
-      `<tr><td colspan="4" class="muted">${transactions.length} tranzacții recunoscute${skipped ? `, ${skipped} rânduri sărite (fără dată sau sumă)` : ''}.</td></tr>`;
+      `<tr><td colspan="4" class="muted">${transactions.length} tranzacții recunoscute${note}. Intrări ${money(Math.round(inn * 100) / 100)}, ieșiri ${money(Math.round(out * 100) / 100)}.</td></tr>`;
+  }
+
+  function renderPdfPreview() {
+    const { meta, result, name } = state.pending;
+    $('mappingCard').hidden = false;
+    $('mappingCard').querySelector('h2').textContent = 'Verifică extrasul';
+    $('mappingInfo').textContent = `${name}: extras maib PDF, contul ${meta.account}` +
+      (meta.period ? `, ${meta.period[0]} – ${meta.period[1]}` : '') +
+      (meta.balance !== null ? `, sold final ${money(meta.balance)}` : '') + '.';
+    $('mapping').innerHTML = '';
+    $('doImportBtn').disabled = !result.length;
+    renderPreviewTable(result);
+    $('mappingCard').scrollIntoView({ behavior: 'smooth' });
   }
 
   async function doImport() {
@@ -250,16 +281,31 @@
     // Păstrăm categoriile schimbate manual la tranzacțiile deja importate.
     const fresh = p.result.filter((t) => !existing.has(t.id));
     await DB.putMany('transactions', fresh);
-    await DB.setSetting('mapping:' + p.sig, { map: p.map, invert: p.invert });
+    if (p.pdf) {
+      // Soldul final al fiecărui cont; îl păstrăm pe cel din extrasul cel mai recent.
+      if (p.meta.balance !== null) {
+        const balances = await DB.getSetting('balances', {});
+        const date = p.meta.generated || p.result.map((t) => t.date).sort().pop();
+        if (!balances[p.meta.account] || balances[p.meta.account].date <= date) {
+          balances[p.meta.account] = { value: p.meta.balance, date };
+          await DB.setSetting('balances', balances);
+        }
+      }
+    } else {
+      await DB.setSetting('mapping:' + p.sig, { map: p.map, invert: p.invert });
+    }
     const dates = p.result.map((t) => t.date).sort();
     state.pending = null;
     $('mappingCard').hidden = true;
     await load();
+    const own = Stats.linkOwnTransfers(state.txs);
+    if (own.length) await DB.putMany('transactions', own);
     if (dates.length) state.month = dates[dates.length - 1].slice(0, 7);
     renderAll();
     showImportResult(`<b>Gata!</b> Am adăugat <b>${fresh.length}</b> tranzacții noi` +
       (p.result.length - fresh.length ? `, ${p.result.length - fresh.length} existau deja` : '') +
       (dates.length ? `, perioada ${dayLabel(dates[0])} – ${dayLabel(dates[dates.length - 1])}` : '') +
+      (own.length ? `. Am găsit ${own.length / 2} transferuri între conturile tale; nu le număr ca venit sau cheltuială` : '') +
       '. <a href="#dashboard">Vezi panoul</a>');
   }
 

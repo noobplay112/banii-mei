@@ -36,7 +36,7 @@
         <h2>Bine ai venit 👋</h2>
         <p>Încă nu ai date. Începe cu:</p>
         <ol>
-          <li><a href="#import">Importă un extras maib</a> (CSV sau Excel)</li>
+          <li><a href="#import">Importă un extras maib</a> (PDF, Excel sau CSV)</li>
           <li><a href="#cash">Spune câți bani ai cash</a></li>
         </ol>
         <p class="muted">Toate datele rămân doar pe acest dispozitiv.</p>
@@ -84,9 +84,9 @@
     <section id="view-import" class="view" hidden>
       <h1>Import extras maib</h1>
       <div class="card">
-        <p>Exportă extrasul din aplicația <b>maib</b> sau din internet banking ca <b>Excel (.xlsx)</b> sau <b>CSV</b>, apoi alege fișierul aici. Fișierul e citit doar pe acest dispozitiv.</p>
+        <p>Descarcă extrasul din aplicația <b>maib</b> ca <b>PDF</b> (sau Excel / CSV din internet banking), apoi alege fișierul aici. Fișierul e citit doar pe acest dispozitiv. Dacă ai mai multe conturi, importă extrasul fiecăruia.</p>
         <label class="file-drop">
-          <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <input type="file" id="fileInput" accept=".pdf,.csv,.txt,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
           <span>Alege fișierul extrasului</span>
         </label>
         <p class="muted small">Tranzacțiile deja importate sunt recunoscute și nu se dublează.</p>
@@ -220,6 +220,7 @@
   <script src="js/categories.js"></script>
   <script src="js/xlsx.js"></script>
   <script src="js/import.js"></script>
+  <script src="js/pdf.js"></script>
   <script src="js/stats.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/app.js"></script>

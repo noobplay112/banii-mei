@@ -21,7 +21,6 @@ const Importer = (() => {
     const head = new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
     if (head[0] === 0x50 && head[1] === 0x4b) return XLSX.read(buf); // „PK” = arhivă ZIP = .xlsx
     if (/\.xls$/i.test(file.name)) throw new Error('Formatul vechi .xls nu e suportat. Salvează extrasul ca .xlsx sau CSV.');
-    if (/\.pdf$/i.test(file.name) || (head[0] === 0x25 && head[1] === 0x50)) throw new Error('Extrasele PDF nu sunt suportate încă. Exportă ca Excel sau CSV.');
     let text = new TextDecoder('utf-8').decode(buf);
     if (text.includes('�')) text = new TextDecoder('windows-1251').decode(buf); // CSV-uri vechi cu chirilice
     return parseCSV(text.replace(/^﻿/, ''));

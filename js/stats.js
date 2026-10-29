@@ -47,12 +47,21 @@ const Stats = (() => {
     return out;
   }
 
-  // Soldul cardului: ultima valoare din coloana „Sold” a extrasului, plus ce s-a adăugat manual după.
-  function cardBalance(txs) {
+  // Soldul de pe card: suma soldurilor finale din extrasele PDF (câte unul pe cont),
+  // altfel ultima valoare din coloana „Sold” a unui extras CSV/Excel.
+  function cardBalance(txs, balances) {
+    const accounts = Object.values(balances || {});
+    if (accounts.length) {
+      return {
+        value: accounts.reduce((s, a) => s + a.value, 0),
+        date: accounts.map((a) => a.date).sort()[0],
+        accounts: accounts.length
+      };
+    }
     const withBal = txs.filter((t) => t.source === 'maib' && typeof t.balance === 'number');
     if (!withBal.length) return null;
     const last = withBal.reduce((a, b) => (b.date >= a.date ? b : a));
-    return { value: last.balance, date: last.date };
+    return { value: last.balance, date: last.date, accounts: 1 };
   }
 
   // Cash estimat acum: ultima sumă declarată + retrageri de la bancomat după ea − depuneri.
@@ -73,6 +82,25 @@ const Stats = (() => {
       if (t.category === 'Depunere numerar') sum -= Math.abs(t.amount);
     }
     return sum;
+  }
+
+  // Găsește transferurile dintre conturile proprii: o ieșire dintr-un cont și o intrare
+  // cu aceeași sumă în alt cont, în cel mult o zi. Le marchează ca mutări, nu cheltuieli.
+  function linkOwnTransfers(txs) {
+    const candidates = new Set(['Transferuri', 'Alte venituri', 'Altele']);
+    const pool = txs.filter((t) => t.account && candidates.has(t.category));
+    const ins = pool.filter((t) => t.amount > 0);
+    const used = new Set();
+    const changed = [];
+    const days = (a, b) => Math.abs(new Date(a) - new Date(b)) / 86400000;
+    for (const out of pool.filter((t) => t.amount < 0).sort((a, b) => (a.date < b.date ? -1 : 1))) {
+      const match = ins.find((t) => !used.has(t.id) && t.account !== out.account &&
+        Math.abs(t.amount + out.amount) < 0.005 && days(t.date, out.date) <= 1);
+      if (!match) continue;
+      used.add(match.id);
+      for (const t of [out, match]) { t.category = 'Între conturile mele'; changed.push(t); }
+    }
+    return changed;
   }
 
   const fmt = (v) => Math.round(v).toLocaleString('ro-RO') + ' MDL';
@@ -140,7 +168,7 @@ const Stats = (() => {
     }
 
     const fees = cur.categories.find((c) => c.name === 'Comisioane bancare');
-    if (fees && fees.total > 0) out.push({ html: `Ai plătit <b>${fmt(fees.total)}</b> comisioane bancare. Retragerile de la bancomatele altor bănci și conversiile valutare costă de obicei cel mai mult.` });
+    if (fees && fees.total >= 1) out.push({ html: `Ai plătit <b>${fmt(fees.total)}</b> comisioane bancare. Retragerile de la bancomatele altor bănci și conversiile valutare costă de obicei cel mai mult.` });
 
     const other = cur.categories.find((c) => c.name === 'Altele');
     if (other && cur.expense > 0 && other.total / cur.expense > 0.2) {
@@ -156,5 +184,5 @@ const Stats = (() => {
     return out;
   }
 
-  return { monthOf, shiftMonth, monthList, summary, lastMonths, cardBalance, cashBalance, movedToCash, insights, fmt, isExpense, isIncome };
+  return { monthOf, shiftMonth, monthList, summary, lastMonths, cardBalance, cashBalance, movedToCash, linkOwnTransfers, insights, fmt, isExpense, isIncome };
 })();
