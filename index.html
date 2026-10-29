@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Banii Mei</title>
+  <meta name="theme-color" content="#1c5cab">
+  <meta name="description" content="Finanțele tale personale, păstrate doar pe dispozitivul tău.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Banii Mei</div>
+    <div class="top-total" id="topTotal" title="Total disponibil (card + cash)">—</div>
+  </header>
+
+  <main id="main">
+    <!-- PANOU -->
+    <section id="view-dashboard" class="view">
+      <div class="row-between">
+        <h1>Panou</h1>
+        <select id="monthSelect" aria-label="Luna"></select>
+      </div>
+
+      <div class="tiles">
+        <div class="tile"><div class="tile-label">Card maib</div><div class="tile-value" id="tileCard">—</div><div class="tile-sub" id="tileCardSub"></div></div>
+        <div class="tile"><div class="tile-label">Cash</div><div class="tile-value" id="tileCash">—</div><div class="tile-sub" id="tileCashSub"></div></div>
+        <div class="tile"><div class="tile-label">Venituri luna</div><div class="tile-value" id="tileIncome">—</div></div>
+        <div class="tile"><div class="tile-label">Cheltuieli luna</div><div class="tile-value" id="tileExpense">—</div><div class="tile-sub" id="tileExpenseSub"></div></div>
+      </div>
+
+      <div class="card" id="emptyState" hidden>
+        <h2>Bine ai venit 👋</h2>
+        <p>Încă nu ai date. Începe cu:</p>
+        <ol>
+          <li><a href="#import">Importă un extras maib</a> (CSV sau Excel)</li>
+          <li><a href="#cash">Spune câți bani ai cash</a></li>
+        </ol>
+        <p class="muted">Toate datele rămân doar pe acest dispozitiv.</p>
+      </div>
+
+      <div class="card">
+        <h2>Pe ce cheltui luna aceasta</h2>
+        <div id="categoryChart" class="chart"></div>
+      </div>
+
+      <div class="card">
+        <h2>Venituri vs. cheltuieli, ultimele 6 luni</h2>
+        <div class="legend">
+          <span><i class="swatch s-income"></i>Venituri</span>
+          <span><i class="swatch s-expense"></i>Cheltuieli</span>
+        </div>
+        <div id="monthsChart" class="chart"></div>
+      </div>
+
+      <div class="card">
+        <h2>Cum poți optimiza</h2>
+        <ul id="insights" class="insights"></ul>
+      </div>
+
+      <div class="card">
+        <h2>Unde se duc cei mai mulți bani</h2>
+        <ol id="topMerchants" class="top-list"></ol>
+      </div>
+    </section>
+
+    <!-- TRANZACTII -->
+    <section id="view-transactions" class="view" hidden>
+      <h1>Tranzacții</h1>
+      <div class="filters">
+        <input type="search" id="txSearch" placeholder="Caută…" aria-label="Caută">
+        <select id="txCategory" aria-label="Categorie"></select>
+        <select id="txMonth" aria-label="Luna"></select>
+      </div>
+      <button class="btn secondary" id="addTxBtn">+ Adaugă manual</button>
+      <div id="txSummary" class="muted small"></div>
+      <ul id="txList" class="tx-list"></ul>
+    </section>
+
+    <!-- IMPORT -->
+    <section id="view-import" class="view" hidden>
+      <h1>Import extras maib</h1>
+      <div class="card">
+        <p>Exportă extrasul din aplicația <b>maib</b> sau din internet banking ca <b>Excel (.xlsx)</b> sau <b>CSV</b>, apoi alege fișierul aici. Fișierul e citit doar pe acest dispozitiv.</p>
+        <label class="file-drop">
+          <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <span>Alege fișierul extrasului</span>
+        </label>
+        <p class="muted small">Tranzacțiile deja importate sunt recunoscute și nu se dublează.</p>
+      </div>
+
+      <div class="card" id="mappingCard" hidden>
+        <h2>Verifică coloanele</h2>
+        <p class="muted small" id="mappingInfo"></p>
+        <div class="mapping" id="mapping"></div>
+        <div class="table-wrap"><table id="previewTable"></table></div>
+        <div class="row gap">
+          <button class="btn" id="doImportBtn">Importă</button>
+          <button class="btn secondary" id="cancelImportBtn">Renunță</button>
+        </div>
+      </div>
+
+      <div class="card" id="importResult" hidden></div>
+    </section>
+
+    <!-- CASH -->
+    <section id="view-cash" class="view" hidden>
+      <h1>Cash</h1>
+      <div class="card">
+        <h2>Câți bani ai cash acum?</h2>
+        <form id="cashForm" class="row gap wrap">
+          <input type="number" id="cashAmount" inputmode="decimal" step="0.01" min="0" placeholder="Suma în MDL" required aria-label="Suma cash">
+          <button class="btn" type="submit">Salvează</button>
+        </form>
+        <p class="muted small" id="cashHint"></p>
+      </div>
+      <div class="card">
+        <h2>Istoric</h2>
+        <ul id="cashList" class="tx-list"></ul>
+      </div>
+    </section>
+
+    <!-- SETARI -->
+    <section id="view-settings" class="view" hidden>
+      <h1>Setări</h1>
+      <div class="card">
+        <h2>Întrebarea despre cash</h2>
+        <label class="field">Întreabă-mă la fiecare
+          <select id="remindDays">
+            <option value="1">1 zi</option><option value="2">2 zile</option>
+            <option value="3">3 zile</option><option value="5">5 zile</option>
+            <option value="7">7 zile</option>
+          </select>
+        </label>
+        <button class="btn secondary" id="notifBtn">Activează notificările</button>
+        <p class="muted small" id="notifStatus"></p>
+      </div>
+
+      <div class="card">
+        <h2>Reguli de categorii</h2>
+        <p class="muted small">Se creează când schimbi categoria unei tranzacții și alegi „aplică la toate similare”.</p>
+        <ul id="rulesList" class="rules"></ul>
+      </div>
+
+      <div class="card">
+        <h2>Copie de rezervă</h2>
+        <p class="muted small">Datele există doar pe acest dispozitiv. Fă din când în când o copie, ca să nu le pierzi dacă ștergi datele browserului.</p>
+        <div class="row gap wrap">
+          <button class="btn secondary" id="exportBtn">Salvează copia (.json)</button>
+          <label class="btn secondary">Restaurează din copie
+            <input type="file" id="restoreInput" accept=".json,application/json" hidden>
+          </label>
+        </div>
+      </div>
+
+      <div class="card danger-zone">
+        <h2>Șterge toate datele</h2>
+        <p class="muted small">Șterge definitiv tranzacțiile, cash-ul și setările de pe acest dispozitiv.</p>
+        <button class="btn danger" id="wipeBtn">Șterge tot</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="Navigare">
+    <a href="#dashboard" data-view="dashboard"><span class="ic">◧</span>Panou</a>
+    <a href="#transactions" data-view="transactions"><span class="ic">≡</span>Tranzacții</a>
+    <a href="#import" data-view="import"><span class="ic">⇪</span>Import</a>
+    <a href="#cash" data-view="cash"><span class="ic">¤</span>Cash</a>
+    <a href="#settings" data-view="settings"><span class="ic">⚙</span>Setări</a>
+  </nav>
+
+  <!-- Dialog: intrebarea despre cash -->
+  <dialog id="cashDialog">
+    <form method="dialog" id="cashDialogForm">
+      <h2>Câți bani ai cash acum?</h2>
+      <p class="muted small" id="cashDialogHint"></p>
+      <input type="number" id="cashDialogAmount" inputmode="decimal" step="0.01" min="0" placeholder="Suma în MDL" aria-label="Suma cash">
+      <div class="row gap">
+        <button class="btn" value="save">Salvează</button>
+        <button class="btn secondary" value="later">Mai târziu</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dialog: editare tranzactie -->
+  <dialog id="txDialog">
+    <form method="dialog" id="txDialogForm">
+      <h2 id="txDialogTitle">Tranzacție</h2>
+      <label class="field">Data <input type="date" id="txDate" required></label>
+      <label class="field">Descriere <input type="text" id="txDesc" required></label>
+      <label class="field">Suma (MDL, minus = cheltuială) <input type="number" id="txAmount" step="0.01" required></label>
+      <label class="field">Categorie <select id="txCat"></select></label>
+      <label class="check" id="txRuleWrap"><input type="checkbox" id="txRule"> Aplică la toate tranzacțiile similare</label>
+      <div class="row gap wrap">
+        <button class="btn" value="save">Salvează</button>
+        <button class="btn secondary" value="cancel" formnovalidate>Renunță</button>
+        <button class="btn danger" value="delete" id="txDeleteBtn" formnovalidate>Șterge</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dialog: confirmare -->
+  <dialog id="confirmDialog">
+    <form method="dialog">
+      <h2 id="confirmTitle">Ești sigur?</h2>
+      <p id="confirmText"></p>
+      <div class="row gap">
+        <button class="btn danger" value="yes">Da</button>
+        <button class="btn secondary" value="no">Nu</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="js/db.js"></script>
+  <script src="js/categories.js"></script>
+  <script src="js/xlsx.js"></script>
+  <script src="js/import.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
