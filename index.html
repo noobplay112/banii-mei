@@ -28,6 +28,7 @@
       <div class="tiles">
         <div class="tile"><div class="tile-label">Card maib</div><div class="tile-value" id="tileCard">—</div><div class="tile-sub" id="tileCardSub"></div></div>
         <div class="tile"><div class="tile-label">Cash</div><div class="tile-value" id="tileCash">—</div><div class="tile-sub" id="tileCashSub"></div></div>
+        <a class="tile tile-link" href="#settings-deposits"><div class="tile-label">Depozit</div><div class="tile-value" id="tileDeposit">—</div><div class="tile-sub" id="tileDepositSub"></div></a>
         <div class="tile"><div class="tile-label">Venituri luna</div><div class="tile-value" id="tileIncome">—</div></div>
         <div class="tile"><div class="tile-label">Cheltuieli luna</div><div class="tile-value" id="tileExpense">—</div><div class="tile-sub" id="tileExpenseSub"></div></div>
       </div>
@@ -126,6 +127,23 @@
     <!-- SETARI -->
     <section id="view-settings" class="view" hidden>
       <h1>Setări</h1>
+      <div class="card" id="depositsCard">
+        <h2>Depozite</h2>
+        <p class="muted small">Banii din depozit nu apar în extrasul cardului, așa că îi adaugi aici o dată. Intră în totalul tău, iar dobânda o calculez estimativ.</p>
+        <div id="depositSuggest"></div>
+        <ul id="depositList" class="tx-list"></ul>
+        <form id="depositForm" class="deposit-form">
+          <label class="field">Nume <input type="text" id="depName" placeholder="ex. Depozit maib" required></label>
+          <label class="field">Suma (MDL) <input type="number" id="depAmount" inputmode="decimal" step="0.01" min="0" required></label>
+          <label class="field">Dobânda anuală (%) <input type="number" id="depRate" inputmode="decimal" step="0.01" min="0" placeholder="opțional"></label>
+          <label class="field">Data deschiderii <input type="date" id="depStart"></label>
+          <label class="field">Data scadenței <input type="date" id="depEnd"></label>
+          <div class="row gap"><button class="btn" type="submit" id="depSave">Adaugă depozitul</button>
+            <button class="btn secondary" type="button" id="depCancel" hidden>Renunță</button>
+            <button class="btn danger" type="button" id="depDelete" hidden>Șterge</button></div>
+        </form>
+      </div>
+
       <div class="card">
         <h2>Întrebarea despre cash</h2>
         <label class="field">Întreabă-mă la fiecare

@@ -1,5 +1,5 @@
 // Service worker: aplicația merge offline și poate trimite memento-ul pentru cash.
-const CACHE = 'banii-mei-v2';
+const CACHE = 'banii-mei-v3';
 const FILES = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './js/db.js', './js/categories.js', './js/xlsx.js', './js/import.js', './js/pdf.js',

@@ -14,6 +14,7 @@
     [state.txs, state.cash, state.rules] = await Promise.all([DB.all('transactions'), DB.all('cash'), DB.all('rules')]);
     state.remindDays = Number(await DB.getSetting('remindDays', 3));
     state.balances = await DB.getSetting('balances', {});
+    state.deposits = await DB.getSetting('deposits', []);
   }
 
   function toast(msg) {
@@ -40,9 +41,16 @@
   function route() {
     let v = location.hash.slice(1) || 'dashboard';
     if (v === 'cash-ask') { askCash(); v = 'cash'; history.replaceState(null, '', '#cash'); }
+    if (v === 'settings-deposits') {
+      v = 'settings';
+      history.replaceState(null, '', '#settings');
+      setTimeout(() => $('depositsCard').scrollIntoView({ behavior: 'smooth' }), 50);
+    }
     if (!VIEWS.includes(v)) v = 'dashboard';
     for (const name of VIEWS) $('view-' + name).hidden = name !== v;
     document.querySelectorAll('.tabbar a').forEach((a) => a.classList.toggle('active', a.dataset.view === v));
+    // Graficele se desenează după lățimea reală, care e 0 cât timp panoul e ascuns.
+    if (v === 'dashboard') renderDashboard();
     window.scrollTo(0, 0);
   }
 
@@ -52,14 +60,110 @@
     renderTransactions();
     renderCash();
     renderSettings();
+    renderDeposits();
   }
 
   // ---------- Sus: total ----------
   function renderTop() {
     const card = Stats.cardBalance(state.txs, state.balances);
     const cash = Stats.cashBalance(state.cash, state.txs);
-    const total = (card ? card.value : 0) + (cash ? cash.value : 0);
-    $('topTotal').textContent = card || cash ? money(Math.round(total)) : '—';
+    const dep = depositTotal();
+    const total = (card ? card.value : 0) + (cash ? cash.value : 0) + dep;
+    $('topTotal').textContent = card || cash || dep ? money(Math.round(total)) : '—';
+  }
+
+  // ---------- Depozite ----------
+  const depositTotal = () => state.deposits.reduce((s, d) => s + d.amount, 0);
+  const monthlyInterest = (d) => (d.amount * (d.rate || 0)) / 100 / 12;
+
+  function renderDepositTile() {
+    const total = depositTotal();
+    $('tileDeposit').textContent = state.deposits.length ? money(Math.round(total)) : '—';
+    const interest = state.deposits.reduce((s, d) => s + monthlyInterest(d), 0);
+    $('tileDepositSub').textContent = !state.deposits.length ? 'adaugă depozitul tău'
+      : interest > 0 ? `~${money(Math.round(interest))}/lună dobândă` : `${state.deposits.length} depozit(e)`;
+  }
+
+  // Transferuri spre depozit găsite în extrase, care încă nu sunt adăugate ca depozit.
+  function depositSuggestions() {
+    const linked = new Set(state.deposits.map((d) => d.fromTx));
+    return state.txs.filter((t) => t.category === 'Economii (depozit)' && t.amount < 0 && !linked.has(t.id));
+  }
+
+  function renderDeposits() {
+    $('depositSuggest').innerHTML = depositSuggestions().map((t) =>
+      `<div class="suggest"><span>În extras: <b>${esc(t.description)}</b>, ${money(-t.amount)} pe ${dayLabel(t.date)}.</span>
+        <button class="btn secondary" data-tx="${t.id}">Adaugă ca depozit</button></div>`).join('');
+    $('depositList').innerHTML = state.deposits.map((d) => {
+      const bits = [];
+      if (d.rate) bits.push(`${d.rate}% pe an, ~${money(Math.round(monthlyInterest(d)))}/lună`);
+      if (d.end) bits.push(`scadent ${dayLabel(d.end)}`);
+      return `<li data-dep="${d.id}"><div class="tx-main"><div class="tx-desc">🏦 ${esc(d.name)}</div><div class="tx-meta">${bits.join(' · ') || 'apasă ca să editezi'}</div></div>
+        <div class="tx-amt">${money(d.amount)}</div></li>`;
+    }).join('');
+  }
+
+  function editDeposit(d, prefill = {}) {
+    state.editingDeposit = d || null;
+    const src = d || prefill;
+    $('depName').value = src.name || 'Depozit maib';
+    $('depAmount').value = src.amount ?? '';
+    $('depRate').value = src.rate ?? '';
+    $('depStart').value = src.start || '';
+    $('depEnd').value = src.end || '';
+    $('depSave').textContent = d ? 'Salvează' : 'Adaugă depozitul';
+    $('depCancel').hidden = !d && !prefill.fromTx;
+    $('depDelete').hidden = !d;
+    state.depositFromTx = prefill.fromTx || null;
+    $('depositForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('depAmount').focus();
+  }
+
+  function resetDepositForm() {
+    state.editingDeposit = null;
+    state.depositFromTx = null;
+    $('depositForm').reset();
+    $('depSave').textContent = 'Adaugă depozitul';
+    $('depCancel').hidden = true;
+    $('depDelete').hidden = true;
+  }
+
+  async function saveDeposit(e) {
+    e.preventDefault();
+    const d = state.editingDeposit || { id: 'd' + DB.uid(), fromTx: state.depositFromTx || undefined };
+    Object.assign(d, {
+      name: $('depName').value.trim() || 'Depozit',
+      amount: Number($('depAmount').value),
+      rate: $('depRate').value ? Number($('depRate').value) : null,
+      start: $('depStart').value || null,
+      end: $('depEnd').value || null
+    });
+    const list = state.deposits.filter((x) => x.id !== d.id).concat(d);
+    await DB.setSetting('deposits', list);
+    resetDepositForm();
+    await load();
+    renderAll();
+    toast('Depozitul a fost salvat.');
+  }
+
+  async function onDepositListClick(e) {
+    const btn = e.target.closest('button[data-tx]');
+    if (btn) {
+      const t = state.txs.find((x) => x.id === btn.dataset.tx);
+      if (t) editDeposit(null, { name: 'Depozit maib', amount: -t.amount, start: t.date, fromTx: t.id });
+      return;
+    }
+    const li = e.target.closest('li[data-dep]');
+    if (li) editDeposit(state.deposits.find((d) => d.id === li.dataset.dep));
+  }
+
+  async function deleteDeposit() {
+    const d = state.editingDeposit;
+    if (!d || !(await confirmBox('Ștergi depozitul?', `${d.name}, ${money(d.amount)}`))) return;
+    await DB.setSetting('deposits', state.deposits.filter((x) => x.id !== d.id));
+    resetDepositForm();
+    await load();
+    renderAll();
   }
 
   // ---------- Panou ----------
@@ -75,6 +179,7 @@
     fillMonthSelect($('monthSelect'), months, state.month);
 
     $('emptyState').hidden = state.txs.length > 0 || state.cash.length > 0;
+    renderDepositTile();
 
     const card = Stats.cardBalance(state.txs, state.balances);
     $('tileCard').textContent = card ? money(Math.round(card.value)) : '—';
@@ -102,7 +207,13 @@
     Charts.categories($('categoryChart'), s.categories, s.expense);
     Charts.months($('monthsChart'), Stats.lastMonths(state.txs, state.month, 6));
 
-    $('insights').innerHTML = Stats.insights(state.txs, state.month)
+    const tips = Stats.insights(state.txs, state.month);
+    const interest = state.deposits.reduce((s, d) => s + monthlyInterest(d), 0);
+    if (interest > 0) tips.push({ html: `Depozitul îți aduce ~<b>${money(Math.round(interest))}</b> pe lună din dobândă.` });
+    else if (depositSuggestions().length && !state.deposits.length) {
+      tips.push({ html: 'Am văzut în extras un transfer spre depozit. <a href="#settings-deposits">Adaugă depozitul</a> ca să intre în totalul tău.' });
+    }
+    $('insights').innerHTML = tips
       .map((i) => `<li class="${i.warn ? 'warn' : ''}">${i.warn ? '⚠️ ' : '💡 '}${i.html}</li>`).join('');
 
     const top = s.merchants.slice(0, 7);
@@ -496,6 +607,11 @@
       await load();
       renderSettings();
     };
+    $('depositForm').onsubmit = saveDeposit;
+    $('depCancel').onclick = resetDepositForm;
+    $('depDelete').onclick = deleteDeposit;
+    $('depositSuggest').onclick = onDepositListClick;
+    $('depositList').onclick = onDepositListClick;
     $('exportBtn').onclick = exportBackup;
     $('restoreInput').onchange = restoreBackup;
     $('wipeBtn').onclick = wipe;
